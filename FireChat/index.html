@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>FireChat | анонимный мессенджер по ID</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0f1e;
+            color: #eef2ff;
+            height: 100vh;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+        }
+        .header {
+            background: #111827;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1f2937;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .firebase-status {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #1e293b;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .led-green {
+            width: 10px;
+            height: 10px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 4px #22c55e;
+        }
+        .led-red {
+            background-color: #ef4444;
+            box-shadow: 0 0 4px #ef4444;
+        }
+        .sidebar {
+            width: 280px;
+            background: #111827;
+            border-right: 1px solid #1f2937;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 1000;
+                transform: translateX(-100%);
+                box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+            }
+            
+            .sidebar.active + .sidebar-overlay {
+                display: block;
+            }
+            
+            .main-content {
+                width: 100%;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+                background: none;
+                border: none;
+                color: white;
+                font-size: 20px;
+                padding: 8px;
+                cursor: pointer;
+                margin-right: 8px;
+            }
+            
+            .chat-header {
+                padding: 10px 12px;
+            }
+            
+            .profile-area, .target-area {
+                padding: 10px 12px;
+                gap: 8px;
+            }
+            
+            .profile-area span, .target-area span {
+                font-size: 13px;
+            }
+            
+            .profile-area input, .target-area input {
+                padding: 6px 10px;
+                font-size: 13px;
+            }
+            
+            .profile-area button, .target-area button {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            
+            .messages {
+                padding: 12px;
+            }
+            
+            .input-area {
+                padding: 10px;
+            }
+            
+            .input-area input {
+                padding: 10px;
+                font-size: 15px;
+            }
+            
+            .input-area button {
+                padding: 0 16px;
+                min-width: 50px;
+            }
+            
+            .chat-item {
+                padding: 10px;
+                margin-bottom: 6px;
+            }
+            
+            .add-chat-form {
+                padding: 12px;
+            }
+            
+            .add-chat-form input {
+                padding: 6px 10px;
+                font-size: 13px;
+            }
+            
+            .add-chat-form button {
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-menu-btn {
+                display: none;
+            }
+        }
+        
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #1f2937;
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chats-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        .chat-item {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-item:hover {
+            background: #2d3748;
+        }
+        
+        .chat-item.active {
+            background: #3b82f6;
+        }
+        
+        .chat-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .chat-name {
+            font-weight: bold;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .chat-id {
+            font-size: 11px;
+            color: #94a3b8;
+            font-family: monospace;
+            margin-top: 2px;
+        }
+        
+        .chat-last-message {
+            font-size: 12px;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+        
+        .chat-remove {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 30px;
+            min-height: 30px;
+        }
+        
+        .chat-remove:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+        
+        .add-chat-form {
+            padding: 16px;
+            border-top: 1px solid #1f2937;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .add-chat-form input {
+            flex: 1;
+            background: #1e293b;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+        }
+        
+        .add-chat-form button {
+            background: #3b82f6;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .profile-area {
+            background: #0f172a;
+            padding: 12px 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #1e2937;
+        }
+        .profile-area input, .profile-area button {
+            background: #1e293b;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+        }
+        .profile-area button {
+            background: #3b82f6;
+            cursor: pointer;
+        }
+        .my-id {
+            background: #1e293b;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .target-area {
+            background: #0f172a;
+            padding: 12px 16px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #1e2937;
+        }
+        .target-area input {
+            background: #1e293b;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 30px;
+            color: white;
+            font-size: 14px;
+            flex: 2;
+            min-width: 160px;
+        }
+        .target-area button {
+            background: #3b82f6;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .chat-header {
+            background: #111827;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1f2937;
+            font-size: 14px;
+        }
+        
+        .close-chat-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            min-width: 60px;
+            min-height: 30px;
+        }
+        
+        .close-chat-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .message {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 8px 14px;
+            max-width: 85%;
+            align-self: flex-start;
+        }
+        .message.own {
+            align-self: flex-end;
+            background: #3b82f6;
+        }
+        .message-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+        .message.own .message-name { color: #bfdbfe; }
+        .message-text { font-size: 15px; word-break: break-word; }
+        .message-time {
+            font-size: 10px;
+            color: #64748b;
+            text-align: right;
+            margin-top: 4px;
+        }
+        .input-area {
+            background: #111827;
+            padding: 12px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #1f2937;
+        }
+        .input-area input {
+            flex: 1;
+            background: #1e293b;
+            border: none;
+            padding: 12px;
+            border-radius: 30px;
+            color: white;
+            font-size: 16px;
+        }
+        .input-area button {
+            background: #3b82f6;
+            border: none;
+            padding: 0 20px;
+            border-radius: 30px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .info-bar {
+            background: #1e1b2e;
+            text-align: center;
+            padding: 6px;
+            font-size: 12px;
+        }
+        .hidden {
+            display: none;
+        }
+        .user-count {
+            background: #1e293b;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>� Чаты</span>
+            <span class="user-count" id="userCount">0/99 чел.</span>
+        </div>
+        
+        <div class="chats-list" id="chatsList">
+            <!-- Список чатов будет добавляться динамически -->
+            <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 14px;">
+                Чатов пока нет. Добавьте ID собеседника ниже.
+            </div>
+        </div>
+        
+        <div class="add-chat-form">
+            <input type="text" id="newChatIdInput" placeholder="ID собеседника" maxlength="20">
+            <button id="addChatBtn">+</button>
+        </div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <div class="main-content">
+        <div class="header">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+            <span>🔥 FireChat</span>
+            <div class="firebase-status" id="firebaseStatus">
+                <span class="led-green"></span> <span>FireBase: проверка...</span>
+            </div>
+        </div>
+
+        <div class="profile-area">
+            <span>👤 Моё имя:</span>
+            <input type="text" id="displayNameInput" placeholder="Как вас зовут?" maxlength="20">
+            <button id="saveNameBtn">Сохранить</button>
+            <span>🆔 Мой ID:</span>
+            <span class="my-id" id="myUserId">---</span>
+        </div>
+
+        <div class="target-area">
+            <span>📩 Текущий собеседник:</span>
+            <input type="text" id="targetUserId" placeholder="ID собеседника" readonly>
+            <button id="setTargetBtn" style="display: none;">Начать диалог</button>
+        </div>
+
+    <div id="chatPanel">
+        <div class="chat-header">
+            <span id="chatHeaderText">💬 Выберите чат</span>
+            <button class="close-chat-btn" id="closeChatBtn" style="display: none;">✕ Закрыть</button>
+        </div>
+        <div class="messages" id="messagesList">
+            <div style="text-align:center; padding: 40px 20px; color: #94a3b8;">
+                <div style="font-size: 18px; margin-bottom: 10px;">💬</div>
+                <div>Выберите чат из списка слева или добавьте нового собеседника</div>
+            </div>
+        </div>
+        <div class="input-area" id="input-area" style="display: none;">
+            <input type="text" id="messageInput" placeholder="Сообщение..." maxlength="500">
+            <button id="sendBtn">→</button>
+        </div>
+    </div>
+
+    <div class="info-bar" id="infoMsg">Ожидание подключения к FireBase...</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+                "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js",
+                "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import { initializeApp } from "firebase/app";
+        import { getDatabase, ref, push, onChildAdded, query, limitToLast, remove, get, set, onValue, update } from "firebase/database";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+
+        // ========== ВАШ КОНФИГ FIREBASE ==========
+        const firebaseConfig = {
+            apiKey: "AIzaSyB2CQxM7pgeKG_ools5TPdu247Z-ktyGr8",
+            authDomain: "firechat-811e7.firebaseapp.com",
+            databaseURL: "https://firechat-811e7-default-rtdb.firebaseio.com",
+            projectId: "firechat-811e7",
+            storageBucket: "firechat-811e7.firebasestorage.app",
+            messagingSenderId: "563720941818",
+            appId: "1:563720941818:web:8c35a04cd7cb1b2b1dd943"
+        };
+        // ========================================
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        // ---- Индикатор подключения к Firebase ----
+        const connectedRef = ref(db, '.info/connected');
+        onValue(connectedRef, (snap) => {
+            const statusDiv = document.getElementById("firebaseStatus");
+            if (snap.val() === true) {
+                statusDiv.innerHTML = '<span class="led-green"></span> <span>FireBase: онлайн</span>';
+                document.getElementById("infoMsg").innerHTML = "✅ FireBase готов. Введите ID собеседника.";
+            } else {
+                statusDiv.innerHTML = '<span class="led-red"></span> <span>FireBase: нет связи</span>';
+                document.getElementById("infoMsg").innerHTML = "❌ Нет соединения с FireBase. Проверьте интернет.";
+            }
+        });
+
+        // ---- Глобальные переменные ----
+        let myUid = null;
+        let myCustomId = null;
+        let myDisplayName = "Аноним";
+        let currentTargetId = null;   // customId собеседника
+        let currentTargetUid = null;
+        let currentMessageUnsubscribe = null; // для отписки от старого диалога
+        const MAX_USERS = 99;
+        let savedChats = []; // массив объектов {id, name, lastMessage, timestamp}
+
+        // ---- Вспомогательные функции ----
+        function escapeHtml(str) {
+            if (!str) return "";
+            return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
+        }
+
+        function getOrCreateLocalData() {
+            let storedName = localStorage.getItem("FireChat_name");
+            if (storedName) myDisplayName = storedName;
+            let storedChats = localStorage.getItem("FireChat_chats");
+            if (storedChats) {
+                try {
+                    savedChats = JSON.parse(storedChats);
+                } catch (e) {
+                    savedChats = [];
+                }
+            }
+        }
+        function saveLocalName() {
+            localStorage.setItem("FireChat_name", myDisplayName);
+        }
+        function saveLocalChats() {
+            localStorage.setItem("FireChat_chats", JSON.stringify(savedChats));
+        }
+
+        function generateCustomId(uid) {
+            // короткий ID: первые 5 символов uid + 3 цифры
+            return uid.substring(0, 5) + Math.floor(Math.random() * 1000);
+        }
+
+        // ---- Функции для работы со списком чатов ----
+        function renderChatsList() {
+            const chatsList = document.getElementById("chatsList");
+            
+            // Сортируем чаты по времени последнего сообщения (новые сверху)
+            savedChats.sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (savedChats.length === 0) {
+                chatsList.innerHTML = '<div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 14px;">Чатов пока нет. Добавьте ID собеседника ниже.</div>';
+                return;
+            }
+            
+            chatsList.innerHTML = '';
+            savedChats.forEach((chat, index) => {
+                const div = document.createElement("div");
+                div.className = `chat-item ${chat.id === currentTargetId ? 'active' : ''}`;
+                div.dataset.chatId = chat.id;
+                div.innerHTML = `
+                    <div class="chat-info">
+                        <div class="chat-name">${escapeHtml(chat.name)}</div>
+                        <div class="chat-id">${escapeHtml(chat.id)}</div>
+                        ${chat.lastMessage ? `<div class="chat-last-message">${escapeHtml(chat.lastMessage)}</div>` : ''}
+                    </div>
+                    <button class="chat-remove" data-index="${index}">×</button>
+                `;
+                chatsList.appendChild(div);
+            });
+            
+            // Добавляем обработчики событий
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('chat-remove')) {
+                        const chatId = item.dataset.chatId;
+                        openChat(chatId);
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.chat-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(btn.dataset.index);
+                    removeChat(index);
+                });
+            });
+        }
+        
+        async function addChat(chatId) {
+            if (!chatId || chatId === myCustomId) {
+                document.getElementById("infoMsg").innerHTML = "Нельзя добавить себя в чаты";
+                return false;
+            }
+            
+            // Проверяем, есть ли уже такой чат
+            const existingChatIndex = savedChats.findIndex(chat => chat.id === chatId);
+            if (existingChatIndex !== -1) {
+                document.getElementById("infoMsg").innerHTML = "Этот чат уже есть в списке";
+                // Переключаемся на существующий чат
+                await openChat(chatId);
+                return true;
+            }
+            
+            // Получаем информацию о пользователе
+            const targetUid = await getUidByCustomId(chatId);
+            if (!targetUid) {
+                document.getElementById("infoMsg").innerHTML = "Пользователь с таким ID не найден";
+                return false;
+            }
+            
+            const userSnap = await get(ref(db, `users/${targetUid}`));
+            if (!userSnap.exists()) {
+                document.getElementById("infoMsg").innerHTML = "Пользователь не в сети";
+                return false;
+            }
+            
+            const targetName = userSnap.val().displayName || chatId;
+            savedChats.push({
+                id: chatId,
+                name: targetName,
+                lastMessage: "",
+                timestamp: Date.now()
+            });
+            
+            saveLocalChats();
+            renderChatsList();
+            document.getElementById("infoMsg").innerHTML = "Чат добавлен!";
+            return true;
+        }
+        
+        function removeChat(index) {
+            if (index >= 0 && index < savedChats.length) {
+                const removedChat = savedChats[index];
+                savedChats.splice(index, 1);
+                saveLocalChats();
+                renderChatsList();
+                
+                // Если удаляем активный чат, закрываем панель чата
+                if (removedChat.id === currentTargetId) {
+                    closeCurrentChat();
+                }
+                
+                document.getElementById("infoMsg").innerHTML = "Чат удалён";
+            }
+        }
+        
+        async function openChat(chatId) {
+            const success = await startDialogWith(chatId);
+            if (success) {
+                renderChatsList(); // Обновляем выделение активного чата
+                document.getElementById("targetUserId").value = chatId;
+                closeMobileSidebar(); // Закрываем боковую панель на мобилке
+            }
+        }
+        
+        function closeCurrentChat() {
+            if (currentMessageUnsubscribe) {
+                currentMessageUnsubscribe();
+                currentMessageUnsubscribe = null;
+            }
+            currentTargetId = null;
+            currentTargetUid = null;
+            
+            // Показываем placeholder
+            document.getElementById("chatHeaderText").innerHTML = "💬 Выберите чат";
+            document.getElementById("messagesList").innerHTML = `
+                <div style="text-align:center; padding: 40px 20px; color: #94a3b8;">
+                    <div style="font-size: 18px; margin-bottom: 10px;">💬</div>
+                    <div>Выберите чат из списка слева или добавьте нового собеседника</div>
+                </div>
+            `;
+            document.getElementById("closeChatBtn").style.display = "none";
+            document.getElementById("input-area").style.display = "none";
+            document.getElementById("targetUserId").value = "";
+            renderChatsList();
+        }
+
+        // Обновление профиля и проверка лимита
+        async function updateMyProfileAndLimit() {
+            if (!myUid) return false;
+            const now = Date.now();
+            // обновляем свою запись
+            const myUserRef = ref(db, `users/${myUid}`);
+            await set(myUserRef, {
+                customId: myCustomId,
+                displayName: myDisplayName,
+                lastSeen: now
+            });
+            // обновляем mapping
+            await set(ref(db, `customIdToUid/${myCustomId}`), myUid);
+
+            // считаем активных пользователей (lastSeen за последние 5 минут)
+            const snapshot = await get(ref(db, "users"));
+            let activeCount = 0;
+            let activeCustomIds = [];
+            if (snapshot.exists()) {
+                for (const [uid, data] of Object.entries(snapshot.val())) {
+                    if (now - data.lastSeen < 300000) {
+                        activeCount++;
+                        if (data.customId) activeCustomIds.push(data.customId);
+                    } else {
+                        // удаляем неактивных
+                        if (data.customId) await set(ref(db, `customIdToUid/${data.customId}`), null);
+                        await set(ref(db, `users/${uid}`), null);
+                    }
+                }
+            }
+            document.getElementById("userCount").innerText = `${activeCount}/${MAX_USERS} чел.`;
+
+            if (activeCount > MAX_USERS || (activeCount >= MAX_USERS && !activeCustomIds.includes(myCustomId))) {
+                document.getElementById("infoMsg").innerHTML = `❌ Достигнут лимит ${MAX_USERS} пользователей. Попробуйте позже.`;
+                document.getElementById("addChatBtn").disabled = true;
+                document.getElementById("sendBtn")?.setAttribute("disabled", "true");
+                return false;
+            }
+            return true;
+        }
+
+        async function getUidByCustomId(customId) {
+            const snap = await get(ref(db, `customIdToUid/${customId}`));
+            if (snap.exists()) return snap.val();
+            return null;
+        }
+
+        // Открытие диалога с выбранным пользователем
+        async function startDialogWith(targetCustomId) {
+            if (!targetCustomId || targetCustomId === myCustomId) {
+                document.getElementById("infoMsg").innerHTML = "Нельзя писать самому себе или ID пуст";
+                return false;
+            }
+            const targetUid = await getUidByCustomId(targetCustomId);
+            if (!targetUid) {
+                document.getElementById("infoMsg").innerHTML = "Пользователь с таким ID не найден или не в сети";
+                return false;
+            }
+            // Проверим, активен ли он (есть ли в users)
+            const userSnap = await get(ref(db, `users/${targetUid}`));
+            if (!userSnap.exists()) {
+                document.getElementById("infoMsg").innerHTML = "Этот пользователь вышел из сети (неактивен)";
+                return false;
+            }
+            currentTargetId = targetCustomId;
+            currentTargetUid = targetUid;
+
+            // Показать панель чата
+            const targetName = userSnap.val().displayName || targetCustomId;
+            document.getElementById("chatHeaderText").innerHTML = `💬 Диалог с <span id="targetName">${escapeHtml(targetName)}</span> (ID: <span id="targetIdSpan">${targetCustomId}</span>)`;
+            document.getElementById("closeChatBtn").style.display = "block";
+            document.getElementById("input-area").style.display = "flex";
+
+            // Отписаться от предыдущих сообщений
+            if (currentMessageUnsubscribe) currentMessageUnsubscribe();
+            
+            // Подписаться на сообщения с этим пользователем
+            const dialogKey = [myUid, targetUid].sort().join("_");
+            const messagesRef = ref(db, `messages/${dialogKey}`);
+            const limitedQuery = query(messagesRef, limitToLast(200));
+            const messagesDiv = document.getElementById("messagesList");
+            messagesDiv.innerHTML = "";
+            
+            const unsubscribe = onChildAdded(limitedQuery, (snapshot) => {
+                const msg = snapshot.val();
+                if (!msg) return;
+                const isOwn = (msg.senderUid === myUid);
+                const div = document.createElement("div");
+                div.className = `message ${isOwn ? "own" : ""}`;
+                const time = new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                div.innerHTML = `
+                    <div class="message-name">${escapeHtml(msg.senderName)}</div>
+                    <div class="message-text">${escapeHtml(msg.text)}</div>
+                    <div class="message-time">${time}</div>
+                `;
+                messagesDiv.appendChild(div);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                
+                // Обновляем последнее сообщение в списке чатов
+                if (!isOwn) {
+                    updateChatLastMessage(targetCustomId, msg.text, false, msg.timestamp);
+                }
+            });
+            currentMessageUnsubscribe = () => unsubscribe();
+            return true;
+        }
+
+        async function sendMessage(text) {
+            if (!text.trim()) return;
+            if (!currentTargetId || !currentTargetUid) {
+                document.getElementById("infoMsg").innerHTML = "Сначала выберите чат из списка слева";
+                return;
+            }
+            const timestamp = Date.now();
+            const dialogKey = [myUid, currentTargetUid].sort().join("_");
+            await push(ref(db, `messages/${dialogKey}`), {
+                senderUid: myUid,
+                senderName: myDisplayName,
+                text: text.trim(),
+                timestamp: timestamp
+            });
+            // Обновляем последнее сообщение в списке чатов
+            updateChatLastMessage(currentTargetId, text.trim(), true, timestamp);
+            // Автоочистка старых сообщений (старше 24 часов)
+            cleanOldMessages(dialogKey);
+        }
+        
+        function updateChatLastMessage(chatId, message, isOwn = false, timestamp = null) {
+            const chatIndex = savedChats.findIndex(chat => chat.id === chatId);
+            if (chatIndex !== -1) {
+                savedChats[chatIndex].lastMessage = (isOwn ? "Вы: " : "") + (message.length > 30 ? message.substring(0, 30) + "..." : message);
+                savedChats[chatIndex].timestamp = timestamp || Date.now();
+                saveLocalChats();
+                renderChatsList();
+            }
+        }
+
+        async function cleanOldMessages(dialogKey) {
+            const refMsg = ref(db, `messages/${dialogKey}`);
+            const snap = await get(refMsg);
+            if (!snap.exists()) return;
+            const now = Date.now();
+            const toDelete = [];
+            snap.forEach(child => {
+                if (now - child.val().timestamp > 86400000) toDelete.push(child.key);
+            });
+            for (let key of toDelete) {
+                await remove(ref(db, `messages/${dialogKey}/${key}`));
+            }
+        }
+
+        // Функция для прослушивания входящих сообщений
+        let incomingMessagesUnsubscribe = null;
+        function listenForIncomingMessages() {
+            if (!myUid || incomingMessagesUnsubscribe) return;
+            
+            // Слушаем все сообщения, где мы являемся участником
+            const messagesRef = ref(db, 'messages');
+            incomingMessagesUnsubscribe = onChildAdded(messagesRef, async (snapshot) => {
+                const dialogKey = snapshot.key;
+                if (!dialogKey || !dialogKey.includes(myUid)) return;
+                
+                // Получаем последнее сообщение в диалоге
+                const messagesSnap = await get(query(ref(db, `messages/${dialogKey}`), limitToLast(1)));
+                if (!messagesSnap.exists()) return;
+                
+                messagesSnap.forEach((msgSnapshot) => {
+                    const msg = msgSnapshot.val();
+                    if (!msg || msg.senderUid === myUid) return; // Пропускаем свои сообщения
+                    
+                    // Определяем ID собеседника
+                    const uids = dialogKey.split('_');
+                    const otherUid = uids[0] === myUid ? uids[1] : uids[0];
+                    
+                    // Получаем customId собеседника
+                    get(ref(db, `users/${otherUid}`)).then((userSnap) => {
+                        if (userSnap.exists()) {
+                            const userData = userSnap.val();
+                            const otherCustomId = userData.customId;
+                            const otherName = userData.displayName || otherCustomId;
+                            
+                            // Добавляем чат в список, если его ещё нет
+                            if (!savedChats.some(chat => chat.id === otherCustomId)) {
+                                savedChats.push({
+                                    id: otherCustomId,
+                                    name: otherName,
+                                    lastMessage: msg.text.substring(0, 30) + (msg.text.length > 30 ? "..." : ""),
+                                    timestamp: msg.timestamp
+                                });
+                                saveLocalChats();
+                                renderChatsList();
+                            } else {
+                                // Обновляем последнее сообщение
+                                updateChatLastMessage(otherCustomId, msg.text, false, msg.timestamp);
+                            }
+                        }
+                    });
+                });
+            });
+        }
+
+        // ---- Firebase Auth ----
+        signInAnonymously(auth);
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                myUid = user.uid;
+                let storedCustomId = localStorage.getItem("FireChat_customId");
+                if (!storedCustomId) {
+                    storedCustomId = generateCustomId(myUid);
+                    localStorage.setItem("FireChat_customId", storedCustomId);
+                }
+                myCustomId = storedCustomId;
+                document.getElementById("myUserId").innerText = myCustomId;
+                
+                getOrCreateLocalData();
+                document.getElementById("displayNameInput").value = myDisplayName;
+                
+                // Рендерим список чатов
+                renderChatsList();
+                
+                // Начинаем слушать входящие сообщения
+                listenForIncomingMessages();
+                
+                await updateMyProfileAndLimit();
+                
+                // Периодическое обновление активности (каждые 2 минуты)
+                setInterval(async () => {
+                    if (myUid) await updateMyProfileAndLimit();
+                }, 120000);
+                
+                // При закрытии страницы – удалить себя из активных
+                window.addEventListener("beforeunload", async () => {
+                    if (myUid) {
+                        await set(ref(db, `users/${myUid}`), null);
+                        await set(ref(db, `customIdToUid/${myCustomId}`), null);
+                    }
+                    if (incomingMessagesUnsubscribe) {
+                        incomingMessagesUnsubscribe();
+                    }
+                });
+                
+                document.getElementById("infoMsg").innerHTML = "Готово! Добавьте ID собеседника в боковой панели.";
+            } else {
+                document.getElementById("infoMsg").innerHTML = "Ошибка анонимного входа. Перезагрузите страницу.";
+            }
+        });
+
+        // ---- Обработчики UI ----
+        document.getElementById("saveNameBtn").addEventListener("click", async () => {
+            const newName = document.getElementById("displayNameInput").value.trim();
+            if (newName) myDisplayName = newName.substring(0, 20);
+            else myDisplayName = "Аноним";
+            saveLocalName();
+            await updateMyProfileAndLimit();
+            document.getElementById("infoMsg").innerHTML = "Имя обновлено!";
+        });
+        
+        document.getElementById("addChatBtn").addEventListener("click", async () => {
+            const chatId = document.getElementById("newChatIdInput").value.trim();
+            if (!chatId) {
+                document.getElementById("infoMsg").innerHTML = "Введите ID собеседника";
+                return;
+            }
+            const success = await addChat(chatId);
+            if (success) {
+                document.getElementById("newChatIdInput").value = "";
+                // Автоматически открываем добавленный чат
+                await openChat(chatId);
+            }
+        });
+        
+        document.getElementById("newChatIdInput").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") document.getElementById("addChatBtn").click();
+        });
+        
+        document.getElementById("sendBtn")?.addEventListener("click", () => {
+            const input = document.getElementById("messageInput");
+            sendMessage(input.value);
+            input.value = "";
+        });
+        document.getElementById("messageInput")?.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") document.getElementById("sendBtn").click();
+        });
+        
+        document.getElementById("closeChatBtn")?.addEventListener("click", () => {
+            closeCurrentChat();
+        });
+        
+        document.getElementById("mobileMenuBtn")?.addEventListener("click", () => {
+            document.querySelector('.sidebar').classList.toggle('active');
+        });
+        
+        document.getElementById("sidebarOverlay")?.addEventListener("click", () => {
+            document.querySelector('.sidebar').classList.remove('active');
+        });
+        
+        // Закрытие боковой панели на мобилке при выборе чата
+        function closeMobileSidebar() {
+            if (window.innerWidth <= 768) {
+                document.querySelector('.sidebar').classList.remove('active');
+            }
+        }
+        
+        // Очистка старых сообщений раз в час
+        setInterval(async () => {
+            if (myUid && currentTargetUid) {
+                const dialogKey = [myUid, currentTargetUid].sort().join("_");
+                await cleanOldMessages(dialogKey);
+            }
+        }, 3600000);
+    </script>
+</body>
+</html>
